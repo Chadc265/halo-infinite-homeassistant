@@ -16,7 +16,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 import voluptuous as vol
 
-from halo_infinite import HaloInfinite
+from halo_infinite import HaloInfinite, CSR, CSREntry
 
 logger = logging.getLogger(__name__)
 
@@ -58,5 +58,7 @@ class HaloInfiniteSensor(Entity):
 
     @property
     def state(self):
-        return self.data.update_csr()
+        csr = self.data.update_csr()
+        cp:CSREntry = csr['crossplay']
+        return cp.current_value
 
