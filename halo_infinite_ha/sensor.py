@@ -9,67 +9,76 @@ sensor:
 """
 from datetime import date, datetime, timedelta
 import logging
+# import async_timeout
+
 from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA,
+    # PLATFORM_SCHEMA,
     SensorStateClass,
-    SensorEntity
+    SensorEntity,
+    SensorEntityDescription
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import CONF_API_KEY, CONF_NAME
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.typing import StateType
-import voluptuous as vol
+# from homeassistant.const import CONF_API_KEY, CONF_NAME
+# import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.typing import StateType, ConfigType
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    # UpdateFailed,
+)
+
+from . import SENSOR_TYPES
+from .const import DOMAIN
 
 from halo_infinite import HaloInfinite,CSREntry
 
 logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(minutes=30)
-DOMAIN = "sensor"
-API_VERSION = "0.3.8"
+# DOMAIN = "sensor"
+# API_VERSION = "0.3.8"
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_API_KEY): cv.string,
-        vol.Required(CONF_NAME): cv.string,
-        vol.Required("gamer_tag"): cv.string,
-        vol.Required("season"): cv.string,
-        vol.Required("api_version"): cv.string
-    }
-)
 
-def setup_platform(hass:HomeAssistant, config, add_entities:AddEntitiesCallback, discovery_info=None):
-    logger.info("load halo sensor")
-    token = config.get(CONF_API_KEY)
-    name = config.get(CONF_NAME)
-    gamertag = config.get("gamer_tag")
-    season = config.get("season")
-    api_version = config.get("api_version")
 
-    halo = HaloInfinite(name, gamertag, token, season, api_version)
-    if not halo:
-        logger.error("Could not make connection to halo api")
+async def async_setup_platform(hass:HomeAssistant, config:ConfigEntry, async_add_entities:AddEntitiesCallback, discovery_info=None):
+    if discovery_info is None:
         return
-    add_entities([HaloInfiniteSensor(hass, halo)], True)
 
-class HaloInfiniteSensor(SensorEntity):
-    def __init__(self, hass:HomeAssistant, halo:HaloInfinite):
-        self._hass = hass
-        self.halo:HaloInfinite = halo
+    api:HaloInfinite = hass.data[DOMAIN]['api']
+    async def async_update_data(ha:HomeAssistant):
+        data = await ha.async_add_executor_job(api.update_csr())
+        return data
+    coordinator = DataUpdateCoordinator(
+        hass,
+        logger,
+        name='sensor',
+        update_method=async_update_data,
+        update_interval=timedelta(minutes=30)
+    )
+    await coordinator.async_config_entry_first_refresh()
+    async_add_entities(
+        [HaloInfiniteSensor(coordinator, des) for des in SENSOR_TYPES],
+        True
+    )
+
+
+class HaloInfiniteSensor(CoordinatorEntity, SensorEntity):
+    def __init__(self, coordinator:DataUpdateCoordinator, description:SensorEntityDescription):
+        super().__init__(coordinator)
+        self.entity_description = description
         self._attr_native_unit_of_measurement = "CSR"
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self.data: dict[str,CSREntry] | None = None
+        self.data: CSREntry | None = None
 
     @property
     def native_value(self) -> StateType:
+        self.data = self.coordinator.data.data[self.entity_description.key]
         if self.data is not None:
-            return self.data['crossplay'].current_value
+            return self.data.current_value
         return -1
 
     @property
     def name(self):
-        return self.halo.name
-
-    def update(self) -> None:
-        self.data = self.halo.update_csr()
+        return self.coordinator.data.name
