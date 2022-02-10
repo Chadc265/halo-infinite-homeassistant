@@ -7,19 +7,25 @@ sensor:
       season: <ranked season>
       api_version: "0.3.8"
 """
+from datetime import date, datetime, timedelta
 import logging
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import (
+    PLATFORM_SCHEMA,
+    SensorStateClass,
+    SensorEntity
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.const import CONF_API_KEY, CONF_NAME
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.typing import StateType
 import voluptuous as vol
 
-from halo_infinite import HaloInfinite, CSR, CSREntry
+from halo_infinite import HaloInfinite,CSREntry
 
 logger = logging.getLogger(__name__)
 
+SCAN_INTERVAL = timedelta(minutes=30)
 DOMAIN = "sensor"
 API_VERSION = "0.3.8"
 
@@ -47,18 +53,23 @@ def setup_platform(hass:HomeAssistant, config, add_entities:AddEntitiesCallback,
         return
     add_entities([HaloInfiniteSensor(hass, halo)], True)
 
-class HaloInfiniteSensor(Entity):
+class HaloInfiniteSensor(SensorEntity):
     def __init__(self, hass:HomeAssistant, halo:HaloInfinite):
         self._hass = hass
-        self.data:HaloInfinite = halo
+        self.halo:HaloInfinite = halo
+        self._attr_native_unit_of_measurement = "CSR"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self.data: dict[str,CSREntry] | None = None
+
+    @property
+    def native_value(self) -> StateType:
+        if self.data is not None:
+            return self.data['crossplay'].current_value
+        return -1
 
     @property
     def name(self):
-        return self.data.name
+        return self.halo.name
 
-    @property
-    def state(self):
-        csr = self.data.update_csr()
-        cp:CSREntry = csr['crossplay']
-        return cp.current_value
-
+    def update(self) -> None:
+        self.data = self.halo.update_csr()
