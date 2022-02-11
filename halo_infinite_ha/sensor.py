@@ -4,81 +4,96 @@ sensor:
     - name: halo_infinite_integration
       api_key: <api_token>
       gamer_tag: <gamertag>
-      season: <ranked season>
       api_version: "0.3.8"
 """
-from datetime import date, datetime, timedelta
+
 import logging
 # import async_timeout
 
 from homeassistant.components.sensor import (
     # PLATFORM_SCHEMA,
-    SensorStateClass,
+    # SensorStateClass,
     SensorEntity,
-    SensorEntityDescription
+    # SensorEntityDescription
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-# from homeassistant.const import CONF_API_KEY, CONF_NAME
-# import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.typing import StateType, ConfigType
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-    # UpdateFailed,
+from homeassistant.helpers.typing import StateType, ConfigType, DiscoveryInfoType
+
+from . import HaloInfiniteSensor
+from .const import (
+    DOMAIN,
+    SENSOR_TYPES,
+    CURRENT,
+    RECENT_CHANGE,
+    # PLAYLISTS,
+    CONTROLLER,
+    CROSSPLAY,
+    ICONS,
 )
 
-from . import SENSOR_TYPES
-from .const import DOMAIN
-
-from halo_infinite import HaloInfinite,CSREntry
+# from halo_infinite import HaloInfinite,CSREntry
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=30)
-# DOMAIN = "sensor"
-# API_VERSION = "0.3.8"
+DESIRED_PLAYLISTS = [CONTROLLER, CROSSPLAY]
 
-
-
-async def async_setup_platform(hass:HomeAssistant, config:ConfigEntry, async_add_entities:AddEntitiesCallback, discovery_info=None):
+def setup_platform(
+        hass:HomeAssistant,
+        config:ConfigType,
+        add_entites:AddEntitiesCallback,
+        discovery_info = None,
+) -> None:
     if discovery_info is None:
         return
 
-    api:HaloInfinite = hass.data[DOMAIN]['api']
-    async def async_update_data(ha:HomeAssistant):
-        data = await ha.async_add_executor_job(api.update_csr())
-        return data
-    coordinator = DataUpdateCoordinator(
-        hass,
-        logger,
-        name='sensor',
-        update_method=async_update_data,
-        update_interval=timedelta(minutes=30)
-    )
-    await coordinator.async_config_entry_first_refresh()
-    async_add_entities(
-        [HaloInfiniteSensor(coordinator, des) for des in SENSOR_TYPES],
-        True
-    )
+    data = hass.data[DOMAIN]
+    data.update()
+
+    sensors = []
+    for s_type in SENSOR_TYPES:
+        for p in DESIRED_PLAYLISTS:
+            sensors.append(HaloInfiniteCSRSensor(data, s_type, p))
+    logger.debug("{} Halo sensors generated".format(len(sensors)))
+    add_entites(sensors)
 
 
-class HaloInfiniteSensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator:DataUpdateCoordinator, description:SensorEntityDescription):
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_native_unit_of_measurement = "CSR"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self.data: CSREntry | None = None
+class HaloInfiniteCSRSensor(HaloInfiniteSensor, SensorEntity):
+    def __init__(self, halo_data, sensor_type, playlist):
+        HaloInfiniteSensor.__init__(self, halo_data)
 
-    @property
-    def native_value(self) -> StateType:
-        self.data = self.coordinator.data.data[self.entity_description.key]
-        if self.data is not None:
-            return self.data.current_value
-        return -1
+        self._state = None
+        self._sensor_type = sensor_type
+        self._playlist = playlist
+
+        self.update()
 
     @property
     def name(self):
-        return self.coordinator.data.name
+        """Return the name of the sensor"""
+        return "{} {} {} CSR".format(
+            self.halo_data.gamertag, self._playlist, self._sensor_type
+        )
+
+    @property
+    def native_value(self) -> StateType:
+        """Return the state of sensor"""
+        return self._state
+
+    @property
+    def icon(self):
+        """ Return the icon for lovelace """
+        if self._sensor_type == CURRENT:
+            return ICONS[self._playlist]
+        elif self._sensor_type == RECENT_CHANGE and self._state is not None:
+            if self._state > 0:
+                return ICONS["increase"]
+            elif self._state < 0:
+                return ICONS["decrease"]
+            else:
+                return ICONS["same"]
+
+    def update(self):
+        """Gets the latest api data and update the sensor state"""
+        HaloInfiniteSensor.update(self)
+        self._state = self.halo_data.get_csr(self._sensor_type, self._playlist)
