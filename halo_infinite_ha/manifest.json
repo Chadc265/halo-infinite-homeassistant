@@ -1,11 +1,11 @@
 {
-  "domain": "halo_infinite",
+  "domain": "halo_infinite_ha",
   "name": "Halo Infinite Stats",
   "documentation": "https://github.com/Chadc265/halo-infinite-homeassistant",
   "issue_tracker": "https://github.com/Chadc265/halo-infinite-homeassistant/issues",
   "dependencies": [],
   "codeowners": ["@chadc265"],
-  "requirements": [ "halo-infinite==0.0.3"],
-  "version": "0.0.1",
+  "requirements": [ "halo-infinite==0.0.6"],
+  "version": "0.0.2",
   "iot_class": "cloud_polling"
 }
