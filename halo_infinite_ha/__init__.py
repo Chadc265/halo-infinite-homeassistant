@@ -3,6 +3,7 @@ from datetime import timedelta
 import logging
 
 import requests.exceptions
+from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
@@ -21,14 +22,14 @@ from .const import (
     CONTROLLER,
     CROSSPLAY,
     MNK,
-    CURRENT,
-    RECENT_CHANGE
+    CSR,
+    KDR
 )
 
 logger = logging.getLogger(__name__)
 
 # PLATFORMS = ['sensor']
-SCAN_INTERVAL = timedelta(minutes=30)
+SCAN_INTERVAL = timedelta(minutes=20)
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -39,6 +40,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Required("gamer_tag"): cv.string,
                 # vol.Required("season"): cv.string,
                 vol.Required("api_version"): cv.string,
+                # vol.Optional("scan_interval_min", default=30): cv.positive_int
             }
         )
     },
@@ -60,13 +62,14 @@ CONFIG_SCHEMA = vol.Schema(
 
 def setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Setup for the Halo Infinite Stats component"""
+    global SCAN_INTERVAL
     logger.debug("load halo sensor")
     token = config[DOMAIN].get(CONF_API_KEY)
     gamertag = config[DOMAIN].get("gamer_tag")
     # season = config.get("season")
     api_version = config[DOMAIN].get("api_version")
-
-    api = HaloInfinite(gamertag, token, api_version)
+    # scan_interval = config[DOMAIN].get("scan_interval_min")
+    api = HaloInfinite(gamertag, token, api_version, num_recent_matches=25)
 
     try:
         data = HaloInfiniteData(api)
@@ -95,7 +98,11 @@ class HaloInfiniteData:
             CONTROLLER: -1,
             MNK: -1
         }
-        self.csr_changes = {}
+        self.current_kdrs = {
+            CROSSPLAY: 0,
+            CONTROLLER: 0,
+            MNK: 0
+        }
         self.new_csr = False
         self.new_matches = False
         self.update()
@@ -104,13 +111,11 @@ class HaloInfiniteData:
     def gamertag(self):
         return self._api.gamertag
 
-    def get_csr(self, sensor_type, playlist):
-        if sensor_type == CURRENT:
+    def get_value(self, sensor_type, playlist):
+        if sensor_type == CSR:
             return self.current_csrs[playlist]
-
-        if sensor_type == RECENT_CHANGE:
-            return self.csr_changes[playlist]
-
+        elif sensor_type == KDR:
+            return self.current_kdrs[playlist]
         logger.debug("Sensor type {} is not valid".format(sensor_type))
         return -1
 
@@ -123,24 +128,23 @@ class HaloInfiniteData:
             MNK: self._api.csrs[MNK].current_value
         }
 
+        """Update new matches before non-csr related stats"""
         self.new_matches = self._api.update_recent_matches()
-        self.csr_changes = self._get_csr_change()
+        self.current_kdrs = self._get_kdr()
         logger.warning("Halo Infinite Stats fetched some data")
 
-    def _get_csr_change(self):
+    def _get_kdr(self):
         if len(self._api.recent_matches) < 1:
             return {CROSSPLAY: 0, CONTROLLER: 0, MNK: 0}
-        recent_csrs = {
-            CROSSPLAY: [x.players[0].before_csr for x in self._api.recent_matches if x.playlist.input == CROSSPLAY],
-            CONTROLLER: [x.players[0].before_csr for x in self._api.recent_matches if x.playlist.input == CONTROLLER],
-            MNK: [x.players[0].before_csr for x in self._api.recent_matches if x.playlist.input == MNK]
+        kdr = {
+            CROSSPLAY: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == CROSSPLAY],
+            CONTROLLER: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == CONTROLLER],
+            MNK: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == MNK]
         }
         ret = {}
         for p in [CROSSPLAY, CONTROLLER, MNK]:
-            if self.current_csrs[p] < 0:
-                ret[p] = 0
-            elif len(recent_csrs[p]) > 0:
-                ret[p] = self.current_csrs[p] - recent_csrs[p][-1]
+            if len(kdr[p]) > 0:
+                ret[p] = round(sum(kdr[p]) / len(kdr[p]), 2)
             else:
                 ret[p] = 0
         return ret
@@ -150,7 +154,7 @@ class HaloInfiniteSensor(Entity):
 
     def __init__(self, halo_data:HaloInfiniteData):
         self.halo_data:HaloInfiniteData = halo_data
-
+        self._attr_state_class = SensorStateClass.MEASUREMENT
         self._sensor_type = None
         self._playlist = None
 

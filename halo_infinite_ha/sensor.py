@@ -12,7 +12,6 @@ import logging
 
 from homeassistant.components.sensor import (
     # PLATFORM_SCHEMA,
-    # SensorStateClass,
     SensorEntity,
     # SensorEntityDescription
 )
@@ -24,8 +23,8 @@ from . import HaloInfiniteSensor
 from .const import (
     DOMAIN,
     SENSOR_TYPES,
-    CURRENT,
-    RECENT_CHANGE,
+    CSR,
+    KDR,
     # PLAYLISTS,
     CONTROLLER,
     CROSSPLAY,
@@ -53,14 +52,15 @@ def setup_platform(
     sensors = []
     for s_type in SENSOR_TYPES:
         for p in DESIRED_PLAYLISTS:
-            sensors.append(HaloInfiniteCSRSensor(data, s_type, p))
+            sensors.append(HaloInfiniteStatSensor(data, s_type, p))
     logger.debug("{} Halo sensors generated".format(len(sensors)))
     add_entites(sensors)
 
 
-class HaloInfiniteCSRSensor(HaloInfiniteSensor, SensorEntity):
+class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
     def __init__(self, halo_data, sensor_type, playlist):
         HaloInfiniteSensor.__init__(self, halo_data)
+        self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type]
 
         self._state = None
         self._sensor_type = sensor_type
@@ -71,8 +71,8 @@ class HaloInfiniteCSRSensor(HaloInfiniteSensor, SensorEntity):
     @property
     def name(self):
         """Return the name of the sensor"""
-        return "{} {} {} CSR".format(
-            self.halo_data.gamertag, self._playlist, self._sensor_type
+        return "{} {} {}".format(
+            self.halo_data.gamertag, self._playlist, SENSOR_TYPES[self._sensor_type]
         )
 
     @property
@@ -83,17 +83,9 @@ class HaloInfiniteCSRSensor(HaloInfiniteSensor, SensorEntity):
     @property
     def icon(self):
         """ Return the icon for lovelace """
-        if self._sensor_type == CURRENT:
-            return ICONS[self._playlist]
-        elif self._sensor_type == RECENT_CHANGE and self._state is not None:
-            if self._state > 0:
-                return ICONS["increase"]
-            elif self._state < 0:
-                return ICONS["decrease"]
-            else:
-                return ICONS["same"]
+        return ICONS[self._sensor_type]
 
     def update(self):
         """Gets the latest api data and update the sensor state"""
         HaloInfiniteSensor.update(self)
-        self._state = self.halo_data.get_csr(self._sensor_type, self._playlist)
+        self._state = self.halo_data.get_value(self._sensor_type, self._playlist)
