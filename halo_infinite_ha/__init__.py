@@ -1,5 +1,5 @@
 """ Halo Infinite CSR Sensor """
-from datetime import timedelta
+from datetime import timedelta, timezone
 import logging
 from typing import Union
 
@@ -15,7 +15,7 @@ from homeassistant.util import Throttle
 
 import voluptuous as vol
 from halo_infinite import HaloInfinite, CSREntry
-# from halo_infinite.match import Match
+from halo_infinite.match import Match
 # from halo_infinite.player import PlayerMatchStats
 
 from .const import (
@@ -100,7 +100,6 @@ class HaloInfiniteData:
             MNK: None
         }
 
-
         self.current_kdrs = {
             CROSSPLAY: 0,
             CONTROLLER: 0,
@@ -114,6 +113,13 @@ class HaloInfiniteData:
     @property
     def gamertag(self):
         return self._api.gamertag
+
+    @property
+    def most_recent_match(self):
+        if len(self._api.recent_matches) > 0:
+            return self._api.recent_matches[0]
+        return None
+
 
     def get_rank_image_url(self, playlist):
         return self.current_csrs[playlist].current_image_url
@@ -138,7 +144,32 @@ class HaloInfiniteData:
         """Update new matches before non-csr related stats"""
         self.new_matches = self._api.update_recent_matches()
         self.current_kdrs = self._get_kdr()
-        logger.warning("Halo Infinite Stats fetched some data")
+        logger.debug("Halo Infinite Stats fetched some data")
+
+    def get_recent_stats(self, playlist):
+        matches:list[Match] = [x for x in self._api.recent_matches if x.playlist.input == playlist]
+        if len(matches) > 0:
+            ret = {
+                'kdr': round(sum([m.players[0].kdr for m in matches]) / len(matches), 2),
+                'damage_ratio': round(
+                    sum(
+                        [m.players[0].damage_stats.damage_dealt /
+                         m.players[0].damage_stats.damage_taken
+                         for m in matches]
+                    ) /
+                    len(matches), 2
+                ),
+                'count': len(matches),
+                'wins': len([m for m in matches if m.players[0].outcome == 'win']),
+                'most_recent': max([m.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None) for m in matches]),
+            }
+            return ret
+        return {
+            'kdr': 0,
+            'damage_ratio': 0,
+            'count': 0,
+            'most_recent': None
+        }
 
     def _get_kdr(self):
         if len(self._api.recent_matches) < 1:

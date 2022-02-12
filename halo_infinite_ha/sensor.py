@@ -50,33 +50,29 @@ def setup_platform(
     data.update()
 
     sensors = []
-    for s_type in SENSOR_TYPES:
-        for p in DESIRED_PLAYLISTS:
-            sensors.append(HaloInfiniteStatSensor(data, s_type, p))
+    # for s_type in SENSOR_TYPES:
+    for p in DESIRED_PLAYLISTS:
+        sensors.append(HaloInfiniteStatSensor(data, p))
     logger.debug("{} Halo sensors generated".format(len(sensors)))
     add_entites(sensors)
 
 
 class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
-    def __init__(self, halo_data, sensor_type, playlist):
+    def __init__(self, halo_data, playlist):
         HaloInfiniteSensor.__init__(self, halo_data)
-        self._attr_native_unit_of_measurement = SENSOR_TYPES[sensor_type]
-
+        self._attr_native_unit_of_measurement = SENSOR_TYPES[CSR]
         self._state = None
-        self._sensor_type = sensor_type
+        # self._sensor_type = sensor_type
         self._playlist = playlist
-
+        self._attr_extra_state_attributes = {}
         self.update()
 
-    @property
-    def has_picture(self):
-        return self._sensor_type == CSR
 
     @property
     def name(self):
         """Return the name of the sensor"""
-        return "{} {} {}".format(
-            self.halo_data.gamertag, self._playlist, SENSOR_TYPES[self._sensor_type]
+        return "{} {}".format(
+            self.halo_data.gamertag, self._playlist
         )
 
     @property
@@ -85,20 +81,23 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
         return self._state
 
     @property
-    def entity_picture(self):
-        """ Return the picture url if one exists """
-        if self.has_picture:
-            return self.halo_data.get_rank_image_url(self._playlist)
-        return None
+    def extra_state_attributes(self):
+        return self._attr_extra_state_attributes
 
     @property
-    def icon(self):
-        """ Return the icon for lovelace """
-        if not self.has_picture:
-            return ICONS[self._sensor_type]
-        return None
+    def entity_picture(self):
+        """ Return the picture url if one exists """
+        return self.halo_data.get_rank_image_url(self._playlist)
+
+    # @property
+    # def icon(self):
+    #     """ Return the icon for lovelace """
+    #     if not self.has_picture:
+    #         return ICONS[self._playlist]
+    #     return None
 
     def update(self):
         """Gets the latest api data and update the sensor state"""
         HaloInfiniteSensor.update(self)
-        self._state = self.halo_data.get_value(self._sensor_type, self._playlist)
+        self._state = self.halo_data.current_csrs[self._playlist].current_value
+        self._attr_extra_state_attributes = self.halo_data.get_recent_stats(self._playlist)
