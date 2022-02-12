@@ -1,6 +1,7 @@
 """ Halo Infinite CSR Sensor """
 from datetime import timedelta
 import logging
+from typing import Union
 
 import requests.exceptions
 from homeassistant.components.sensor import SensorStateClass
@@ -13,7 +14,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.util import Throttle
 
 import voluptuous as vol
-from halo_infinite import HaloInfinite
+from halo_infinite import HaloInfinite, CSREntry
 # from halo_infinite.match import Match
 # from halo_infinite.player import PlayerMatchStats
 
@@ -93,11 +94,13 @@ class HaloInfiniteData:
     """Get updated data from Halo api"""
     def __init__(self, api:HaloInfinite):
         self._api:HaloInfinite = api
-        self.current_csrs = {
-            CROSSPLAY: -1,
-            CONTROLLER: -1,
-            MNK: -1
+        self.current_csrs: Union[dict[str,CSREntry], dict[str,None]] = {
+            CROSSPLAY: None,
+            CONTROLLER: None,
+            MNK: None
         }
+
+
         self.current_kdrs = {
             CROSSPLAY: 0,
             CONTROLLER: 0,
@@ -107,13 +110,17 @@ class HaloInfiniteData:
         self.new_matches = False
         self.update()
 
+
     @property
     def gamertag(self):
         return self._api.gamertag
 
+    def get_rank_image_url(self, playlist):
+        return self.current_csrs[playlist].current_image_url
+
     def get_value(self, sensor_type, playlist):
         if sensor_type == CSR:
-            return self.current_csrs[playlist]
+            return self.current_csrs[playlist].current_value
         elif sensor_type == KDR:
             return self.current_kdrs[playlist]
         logger.debug("Sensor type {} is not valid".format(sensor_type))
@@ -123,9 +130,9 @@ class HaloInfiniteData:
     def update(self):
         self.new_csr = self._api.update_csr()
         self.current_csrs = {
-            CROSSPLAY: self._api.csrs[CROSSPLAY].current_value,
-            CONTROLLER: self._api.csrs[CONTROLLER].current_value,
-            MNK: self._api.csrs[MNK].current_value
+            CROSSPLAY: self._api.csrs[CROSSPLAY],
+            CONTROLLER: self._api.csrs[CONTROLLER],
+            MNK: self._api.csrs[MNK]
         }
 
         """Update new matches before non-csr related stats"""

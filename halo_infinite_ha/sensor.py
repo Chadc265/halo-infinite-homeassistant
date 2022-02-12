@@ -69,6 +69,10 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
         self.update()
 
     @property
+    def has_picture(self):
+        return self._sensor_type == CSR
+
+    @property
     def name(self):
         """Return the name of the sensor"""
         return "{} {} {}".format(
@@ -81,9 +85,18 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
         return self._state
 
     @property
+    def entity_picture(self):
+        """ Return the picture url if one exists """
+        if self.has_picture:
+            return self.halo_data.get_rank_image_url(self._playlist)
+        return None
+
+    @property
     def icon(self):
         """ Return the icon for lovelace """
-        return ICONS[self._sensor_type]
+        if not self.has_picture:
+            return ICONS[self._sensor_type]
+        return None
 
     def update(self):
         """Gets the latest api data and update the sensor state"""
