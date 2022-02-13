@@ -38,13 +38,10 @@ CONFIG_SCHEMA = vol.Schema(
         DOMAIN: vol.Schema(
             {
                 vol.Required(CONF_API_KEY): cv.string,
-                # vol.Required(CONF_NAME): cv.string,
                 vol.Required("gamer_tag"): cv.string,
-                # vol.Required("season"): cv.string,
                 vol.Optional(CONF_LIST, default=PLAYLISTS): vol.All(
                     cv.ensure_list, [cv.string], [vol.In(PLAYLISTS)]
                 ),
-                # vol.Optional("scan_interval_min", default=30): cv.positive_int
             }
         )
     },
@@ -57,8 +54,6 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
     token = config[DOMAIN].get(CONF_API_KEY)
     gamertag = config[DOMAIN].get("gamer_tag")
     playlists = config[DOMAIN].get(CONF_LIST)
-    # season = config.get("season")
-    # scan_interval = config[DOMAIN].get("scan_interval_min")
     api = HaloInfinite(gamertag, token, API_VERSION, num_recent_matches=25)
 
     try:
@@ -120,7 +115,6 @@ class HaloInfiniteData:
         }
 
         self.new_matches = self._api.update_recent_matches()
-        # self.current_kdrs = self._get_kdr()
         logger.debug("Halo Infinite Stats fetched some data")
 
     def get_recent_stats(self, playlist):
