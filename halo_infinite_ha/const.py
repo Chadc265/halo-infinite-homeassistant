@@ -1,6 +1,9 @@
 """ Contants for Halo Infinite integration"""
 
 DOMAIN = "halo_infinite_ha"
+CONF_LIST = "ranked_inputs"
+API_VERSION = "0.3.8"
+
 CSR = "csr"
 KDR = "k/d"
 CROSSPLAY = "crossplay"

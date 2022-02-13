@@ -4,38 +4,27 @@ sensor:
     - name: halo_infinite_integration
       api_key: <api_token>
       gamer_tag: <gamertag>
-      api_version: "0.3.8"
+      ranked_inputs:
+        - crossplay
+        - controller
+        - mnk
 """
 
 import logging
-# import async_timeout
 
-from homeassistant.components.sensor import (
-    # PLATFORM_SCHEMA,
-    SensorEntity,
-    # SensorEntityDescription
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import StateType, ConfigType, DiscoveryInfoType
+from homeassistant.helpers.typing import StateType, ConfigType
 
 from . import HaloInfiniteSensor
 from .const import (
     DOMAIN,
     SENSOR_TYPES,
     CSR,
-    KDR,
-    # PLAYLISTS,
-    CONTROLLER,
-    CROSSPLAY,
-    ICONS,
 )
 
-# from halo_infinite import HaloInfinite,CSREntry
-
 logger = logging.getLogger(__name__)
-
-DESIRED_PLAYLISTS = [CONTROLLER, CROSSPLAY]
 
 def setup_platform(
         hass:HomeAssistant,
@@ -48,21 +37,21 @@ def setup_platform(
 
     data = hass.data[DOMAIN]
     data.update()
-
+    playlists = data.playlists
     sensors = []
-    # for s_type in SENSOR_TYPES:
-    for p in DESIRED_PLAYLISTS:
+    for p in playlists:
         sensors.append(HaloInfiniteStatSensor(data, p))
+
     logger.debug("{} Halo sensors generated".format(len(sensors)))
     add_entites(sensors)
 
 
 class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
+    """Sensor to track Halo Infinite CSR with attributes for recent statistics"""
     def __init__(self, halo_data, playlist):
         HaloInfiniteSensor.__init__(self, halo_data)
         self._attr_native_unit_of_measurement = SENSOR_TYPES[CSR]
         self._state = None
-        # self._sensor_type = sensor_type
         self._playlist = playlist
         self._attr_extra_state_attributes = {}
         self.update()
@@ -89,12 +78,6 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
         """ Return the picture url if one exists """
         return self.halo_data.get_rank_image_url(self._playlist)
 
-    # @property
-    # def icon(self):
-    #     """ Return the icon for lovelace """
-    #     if not self.has_picture:
-    #         return ICONS[self._playlist]
-    #     return None
 
     def update(self):
         """Gets the latest api data and update the sensor state"""

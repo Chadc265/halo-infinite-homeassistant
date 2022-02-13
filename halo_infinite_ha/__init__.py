@@ -16,20 +16,21 @@ from homeassistant.util import Throttle
 import voluptuous as vol
 from halo_infinite import HaloInfinite, CSREntry
 from halo_infinite.match import Match
-# from halo_infinite.player import PlayerMatchStats
 
 from .const import (
     DOMAIN,
+    CONF_LIST,
+    API_VERSION,
     CONTROLLER,
     CROSSPLAY,
     MNK,
     CSR,
-    KDR
+    KDR,
+    PLAYLISTS,
 )
 
 logger = logging.getLogger(__name__)
 
-# PLATFORMS = ['sensor']
 SCAN_INTERVAL = timedelta(minutes=20)
 
 CONFIG_SCHEMA = vol.Schema(
@@ -40,7 +41,9 @@ CONFIG_SCHEMA = vol.Schema(
                 # vol.Required(CONF_NAME): cv.string,
                 vol.Required("gamer_tag"): cv.string,
                 # vol.Required("season"): cv.string,
-                vol.Required("api_version"): cv.string,
+                vol.Optional(CONF_LIST, default=PLAYLISTS): vol.All(
+                    cv.ensure_list, [cv.string], [vol.In(PLAYLISTS)]
+                ),
                 # vol.Optional("scan_interval_min", default=30): cv.positive_int
             }
         )
@@ -48,34 +51,19 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-# SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
-#     SensorEntityDescription(
-#         key="crossplay",
-#         name="crossplay",
-#         icon="mdi:arrow-top-left-bottom-right"
-#     ),
-#     SensorEntityDescription(
-#         key='controller',
-#         name='controller',
-#         icon='mdi:microsoft-xbox-controller'
-#     )
-# )
-
 def setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Setup for the Halo Infinite Stats component"""
-    global SCAN_INTERVAL
     logger.debug("load halo sensor")
     token = config[DOMAIN].get(CONF_API_KEY)
     gamertag = config[DOMAIN].get("gamer_tag")
+    playlists = config[DOMAIN].get(CONF_LIST)
     # season = config.get("season")
-    api_version = config[DOMAIN].get("api_version")
     # scan_interval = config[DOMAIN].get("scan_interval_min")
-    api = HaloInfinite(gamertag, token, api_version, num_recent_matches=25)
+    api = HaloInfinite(gamertag, token, API_VERSION, num_recent_matches=25)
 
     try:
-        data = HaloInfiniteData(api)
+        data = HaloInfiniteData(api, playlists)
         data.update()
-        logger.debug("Halo Infinite Stats fetched some data")
     except requests.exceptions.RequestException:
         msg = """
             Halo Infinite Stats failed to fetch data from Autocode. Check your gamertag, token, and api_version.
@@ -83,28 +71,22 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
         logger.error(msg)
         return False
     hass.data[DOMAIN] = data
-    """Crossplay csr sensor"""
     discovery.load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
-    # discovery.load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
 
     return True
 
 
 class HaloInfiniteData:
     """Get updated data from Halo api"""
-    def __init__(self, api:HaloInfinite):
+    def __init__(self, api:HaloInfinite, playlists):
         self._api:HaloInfinite = api
+        self.playlists = playlists
         self.current_csrs: Union[dict[str,CSREntry], dict[str,None]] = {
             CROSSPLAY: None,
             CONTROLLER: None,
             MNK: None
         }
 
-        self.current_kdrs = {
-            CROSSPLAY: 0,
-            CONTROLLER: 0,
-            MNK: 0
-        }
         self.new_csr = False
         self.new_matches = False
         self.update()
@@ -112,28 +94,24 @@ class HaloInfiniteData:
 
     @property
     def gamertag(self):
+        """Return the gamertag from the api"""
         return self._api.gamertag
 
     @property
     def most_recent_match(self):
+        """Return the most recent match pulled via api"""
         if len(self._api.recent_matches) > 0:
             return self._api.recent_matches[0]
         return None
 
 
     def get_rank_image_url(self, playlist):
+        """Return the rank icon image url for a playlist/input"""
         return self.current_csrs[playlist].current_image_url
-
-    def get_value(self, sensor_type, playlist):
-        if sensor_type == CSR:
-            return self.current_csrs[playlist].current_value
-        elif sensor_type == KDR:
-            return self.current_kdrs[playlist]
-        logger.debug("Sensor type {} is not valid".format(sensor_type))
-        return -1
 
     @Throttle(SCAN_INTERVAL)
     def update(self):
+        """Update the data via api. The results are cached to reduce the polling rate for free accounts"""
         self.new_csr = self._api.update_csr()
         self.current_csrs = {
             CROSSPLAY: self._api.csrs[CROSSPLAY],
@@ -141,12 +119,12 @@ class HaloInfiniteData:
             MNK: self._api.csrs[MNK]
         }
 
-        """Update new matches before non-csr related stats"""
         self.new_matches = self._api.update_recent_matches()
-        self.current_kdrs = self._get_kdr()
+        # self.current_kdrs = self._get_kdr()
         logger.debug("Halo Infinite Stats fetched some data")
 
     def get_recent_stats(self, playlist):
+        """Return updated attributes calculated from the stored recent matches"""
         matches:list[Match] = [x for x in self._api.recent_matches if x.playlist.input == playlist]
         if len(matches) > 0:
             ret = {
@@ -171,22 +149,6 @@ class HaloInfiniteData:
             'most_recent': None
         }
 
-    def _get_kdr(self):
-        if len(self._api.recent_matches) < 1:
-            return {CROSSPLAY: 0, CONTROLLER: 0, MNK: 0}
-        kdr = {
-            CROSSPLAY: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == CROSSPLAY],
-            CONTROLLER: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == CONTROLLER],
-            MNK: [x.players[0].kdr for x in self._api.recent_matches if x.playlist.input == MNK]
-        }
-        ret = {}
-        for p in [CROSSPLAY, CONTROLLER, MNK]:
-            if len(kdr[p]) > 0:
-                ret[p] = round(sum(kdr[p]) / len(kdr[p]), 2)
-            else:
-                ret[p] = 0
-        return ret
-
 class HaloInfiniteSensor(Entity):
     """ Implementation of Halo Stats sensor for CSR """
 
@@ -197,4 +159,5 @@ class HaloInfiniteSensor(Entity):
         self._playlist = None
 
     def update(self):
+        """Ask the data handler to update"""
         self.halo_data.update()
