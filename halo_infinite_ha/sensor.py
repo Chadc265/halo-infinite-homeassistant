@@ -1,7 +1,6 @@
 """
 add this to config
 sensor:
-    - name: halo_infinite_integration
       api_key: <api_token>
       gamer_tag: <gamertag>
       ranked_inputs:
