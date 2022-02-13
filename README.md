@@ -7,7 +7,7 @@ Once added to config/custom_components, you can use the following in confuration
 
 sensor:  
 &nbsp;&nbsp;api_key: <api_token>  
-&nbsp;&nbsp;gamer_tag: <gamertag>  
+&nbsp;&nbsp;gamer_tag: <gamer_tag>  
 &nbsp;&nbsp;ranked_inputs:  
 &nbsp;&nbsp;&nbsp;&nbsp;- crossplay  
 &nbsp;&nbsp;&nbsp;&nbsp;- controller  
