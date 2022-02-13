@@ -31,7 +31,7 @@ from .const import (
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=20)
+SCAN_INTERVAL = timedelta(minutes=5)
 
 CONFIG_SCHEMA = vol.Schema(
     {
