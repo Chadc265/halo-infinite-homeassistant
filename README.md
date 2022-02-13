@@ -5,13 +5,13 @@ are needed for each poll, so this will use ~17,300 of your free api rate per mon
 
 Once added to config/custom_components, you can use the following in confuration.yaml:
 
-sensor:
-      api_key: <api_token>
-      gamer_tag: <gamertag>
-      ranked_inputs:
-        - crossplay
-        - controller
-        - mnk
+sensor:  
+&nbsp;&nbsp;api_key: <api_token>  
+&nbsp;&nbsp;gamer_tag: <gamertag>  
+&nbsp;&nbsp;ranked_inputs:  
+&nbsp;&nbsp;&nbsp;&nbsp;- crossplay  
+&nbsp;&nbsp;&nbsp;&nbsp;- controller  
+&nbsp;&nbsp;&nbsp;&nbsp;- mnk  
         
-  Playlist options may be excluded from the configuration.
+Playlist options may be excluded from the configuration.  
   
