@@ -4,7 +4,6 @@ import logging
 from typing import Union
 
 import requests.exceptions
-from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
@@ -148,7 +147,6 @@ class HaloInfiniteSensor(Entity):
 
     def __init__(self, halo_data:HaloInfiniteData):
         self.halo_data:HaloInfiniteData = halo_data
-        self._attr_state_class = SensorStateClass.MEASUREMENT
         self._sensor_type = None
         self._playlist = None
 

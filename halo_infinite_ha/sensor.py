@@ -11,7 +11,7 @@ sensor:
 
 import logging
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType, ConfigType
@@ -41,7 +41,7 @@ def setup_platform(
     for p in playlists:
         sensors.append(HaloInfiniteStatSensor(data, p))
 
-    logger.debug("{} Halo sensors generated".format(len(sensors)))
+    logger.debug("{n_sensors} Halo sensors generated".format(n_sensors=len(sensors)))
     add_entites(sensors)
 
 
@@ -49,18 +49,18 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
     """Sensor to track Halo Infinite CSR with attributes for recent statistics"""
     def __init__(self, halo_data, playlist):
         HaloInfiniteSensor.__init__(self, halo_data)
+        self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = SENSOR_TYPES[CSR]
         self._state = None
         self._playlist = playlist
         self._attr_extra_state_attributes = {}
         self.update()
 
-
     @property
     def name(self):
         """Return the name of the sensor"""
-        return "{} {}".format(
-            self.halo_data.gamertag, self._playlist
+        return "{tag} {playlist}".format(
+            tag=self.halo_data.gamertag, playlist=self._playlist
         )
 
     @property
@@ -70,13 +70,13 @@ class HaloInfiniteStatSensor(HaloInfiniteSensor, SensorEntity):
 
     @property
     def extra_state_attributes(self):
+        """Returns the extra attributes"""
         return self._attr_extra_state_attributes
 
     @property
     def entity_picture(self):
-        """ Return the picture url if one exists """
+        """Return the picture url if one exists"""
         return self.halo_data.get_rank_image_url(self._playlist)
-
 
     def update(self):
         """Gets the latest api data and update the sensor state"""
