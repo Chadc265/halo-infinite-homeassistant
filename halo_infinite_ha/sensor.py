@@ -9,6 +9,7 @@ sensor:
         - mnk
 """
 
+from datetime import timezone
 import logging
 from typing import Union
 
@@ -134,7 +135,7 @@ class HaloInfiniteMatchSensor(HaloInfiniteSensor, SensorEntity):
         """Gets the latest api data and updates the sensor state"""
         HaloInfiniteSensor.update(self)
         self._recent_match:Match = self.halo_data.most_recent_match
-        self._state = self._recent_match.date_time
+        self._state = self._recent_match.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
         self._attr_extra_state_attributes = self._get_state_attr()
 
     def _get_state_attr(self):
