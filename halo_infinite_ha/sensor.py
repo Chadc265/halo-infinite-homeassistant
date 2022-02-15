@@ -94,7 +94,6 @@ class HaloInfiniteMatchSensor(HaloInfiniteSensor, SensorEntity):
     """Sensor to show most recent match with stats for players"""
     def __init__(self, halo_data):
         HaloInfiniteSensor.__init__(self, halo_data)
-        self._attr_native_unit_of_measurement = SENSOR_TYPES[MATCH]
         self._state = None
         self._attr_extra_state_attributes = {}
         self._recent_match:Union[Match,None] = None
@@ -103,7 +102,7 @@ class HaloInfiniteMatchSensor(HaloInfiniteSensor, SensorEntity):
     @property
     def name(self):
         """Return the name of the sensor"""
-        return "{tag} Last Match".format(
+        return "{tag} Last Ranked Match".format(
             tag=self.halo_data.gamertag
         )
 
@@ -135,8 +134,10 @@ class HaloInfiniteMatchSensor(HaloInfiniteSensor, SensorEntity):
         """Gets the latest api data and updates the sensor state"""
         HaloInfiniteSensor.update(self)
         self._recent_match:Match = self.halo_data.most_recent_match
-        self._state = self._recent_match.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
         self._attr_extra_state_attributes = self._get_state_attr()
+        last_result = self._attr_extra_state_attributes.get("outcome")
+        if last_result is not None:
+            self._state = last_result
 
     def _get_state_attr(self):
         if self._recent_match is None:
@@ -144,6 +145,7 @@ class HaloInfiniteMatchSensor(HaloInfiniteSensor, SensorEntity):
         if len(self._recent_match.players) < 1:
             return {}
         ret = {
+            'date_time': self._recent_match.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None),
             'mode': self._recent_match.mode,
             'map': self._recent_match.map,
             'input': self._recent_match.playlist.input,
