@@ -132,14 +132,14 @@ class HaloInfiniteData:
                 ),
                 'count': len(matches),
                 'wins': len([m for m in matches if m.players[0].outcome == 'win']),
-                'most_recent': max([m.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None) for m in matches]),
+                'last_update': max([m.date_time.replace(tzinfo=timezone.utc).astimezone(tz=None) for m in matches]),
             }
             return ret
         return {
             'kdr': 0,
             'damage_ratio': 0,
             'count': 0,
-            'most_recent': None
+            'last_update': None
         }
 
 class HaloInfiniteSensor(Entity):
