@@ -2,7 +2,7 @@
 
 DOMAIN = "halo_infinite_ha"
 CONF_LIST = "ranked_inputs"
-API_VERSION = "0.3.8"
+API_VERSION = "0.3.9"
 
 CSR = "csr"
 KDR = "k/d"
